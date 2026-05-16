@@ -33,9 +33,9 @@ Registro cronológico das decisões tomadas na análise. Cada entrada documenta 
 
 ### 3. Tratamento de outliers em annual_inc
 
-**Decisão:** Winsorização no percentil 99 para visualizações e estatísticas descritivas; dados completos mantidos para regressão logística com `class_weight='balanced'`.
+**Decisão:** Winsorização no percentil 99 para visualizações, estatísticas descritivas e a variável `annual_inc_w` usada na regressão logística inferencial.
 
-**Justificativa:** Max observado na amostra: $5.119.032. A distribuição é altamente skewed (mean $85.879 vs mediana $70.000). Winsorizar preserva toda a amostra sem distorcer gráficos. Para a regressão, os outliers são controlados pelo regularizador (C padrão=1.0).
+**Justificativa:** Max observado na amostra: $5.119.032. A distribuição é altamente skewed (mean $85.879 vs mediana $70.000). Winsorizar preserva toda a amostra sem distorcer gráficos e reduz a influência de valores extremos na interpretação dos odds ratios. A regressão usa `statsmodels.Logit`, sem `class_weight` e sem balanceamento artificial de classe.
 
 **Alternativa descartada:** Filtragem por corte fixo (ex: annual_inc > $500k) perderia registros possivelmente válidos de high-income borrowers.
 
@@ -187,6 +187,88 @@ as duas modalidades.
 a fronteira entre *risk-based pricing* (permitido) e *underwriting cutoff* por região
 (proibido). Sem essa nota, as recomendações poderiam ser implementadas de forma
 ilegal por uma equipe júnior.
+
+---
+
+## [2026-05-16] Versão avançada do notebook + documentos de defesa
+
+### 11. Criação do notebook em versão avançada
+
+**Decisão:** criar `credence_analise_avancado.ipynb` — terceira versão do notebook, cópia
+completa da canônica (9 seções) acrescida de quatro técnicas de modelagem de nível comitê.
+Não substitui o notebook canônico.
+
+**Justificativa:** responde a quatro lacunas que um avaliador sênior aponta sobre a regressão
+logística da Seção 5 — validação temporal, calibração probabilística, tempo-até-evento e
+interpretação econômica dos coeficientes. As Seções 6/7/8 do canônico foram renumeradas para
+7/8/9; a nova Seção 6 é a análise de sobrevivência.
+
+**Replicação:** não replicada na versão 100% PT — é extensão exploratória, não a análise
+oficial. O canônico segue como versão a manter.
+
+---
+
+### 12. Validação temporal — split treino 2007–2015 / teste 2016–2018
+
+**Decisão:** treinar a regressão logística apenas com loans de 2007–2015 e validá-la nos de
+2016–2018.
+
+**Justificativa:** avaliar o modelo no mesmo período em que foi treinado superestima a
+performance. O corte em 2015 deixa N robusto nos dois lados (treino 825.569; teste 480.502).
+
+**Resultado (execução 2026-05-16):** AUC 0,706 → 0,684 (degradação 0,022); Brier 0,138 → 0,166;
+default rate 18,5% → 22,9%. Leitura: o ranking de risco é estável out-of-time, mas o nível
+absoluto da probabilidade é subestimado — compatível com drift do regime de risco.
+
+---
+
+### 13. Análise de sobrevivência — `last_pymnt_d` como eixo do tempo
+
+**Decisão:** derivar a duração observada (meses entre `issue_d` e `last_pymnt_d`); evento =
+`default_flag`; loans `Fully Paid` tratados como observações censuradas à direita.
+
+**Conflito aparente com a regra de leakage — resolvido:** o CLAUDE.md classifica `last_pymnt_d`
+como LEAKAGE SEVERO, e está certo *para uso como feature preditiva*. Na análise de sobrevivência
+ela **não é feature** — define o eixo do tempo do estudo. Uso padrão e legítimo na literatura
+de risco de crédito; documentado explicitamente no notebook (Seção 6.1) e no CLAUDE.md.
+
+**Ferramenta:** `statsmodels` (`SurvfuncRight`, `survdiff`, `PHReg`) — evita introduzir
+`lifelines`/`scikit-survival`, mantendo a stack pinada do projeto.
+
+**Resultado:** 1.241.223 loans com tempo-até-evento válido; duração mediana 19 meses; 20,9% de
+eventos. Log-rank 36m × 60m: χ² ≈ 25.335 (p < 0,001). Cox HR — grade 1,44/passo, term60 1,19,
+dti 1,003/ponto, log(renda) 0,85.
+
+**Limitação documentada — viés de resolução:** a base contém apenas loans com desfecho
+resolvido. Para as safras 2016–2018 isso introduz viés de seleção (loans `Current` excluídos;
+defaults precoces resolvem primeiro). A leitura de vintage via sobrevivência é confiável apenas
+para coortes maduras (≤ 2015). Correção de produção: incluir loans `Current` como observações
+censuradas na data do snapshot. Sinalizado no notebook (ressalva da Seção 6.4 + síntese).
+
+---
+
+### 14. Calibração probabilística — isotônica como referência diagnóstica
+
+**Decisão:** avaliar a calibração no recorte de teste (diagrama de confiabilidade + Brier
+score) e incluir uma recalibração isotônica apenas como referência do ganho possível, não
+como modelo final.
+
+**Resultado:** o gap (default observado − probabilidade prevista) é positivo nos dez decis,
+chegando a +7 p.p. — o modelo subestima sistematicamente o risco das safras recentes. Brier
+0,166 → 0,163 com a isotônica. Consequência: adicionada a Recomendação 8 à Seção 8 do notebook
+avançado — recalibrar o modelo antes de uso em provisão/pricing e monitorar calibração por
+safra (não só AUC).
+
+---
+
+### 15. Documentos de defesa oral
+
+**Decisão:** criar `docs/defesa_oral.md` (domínio completo), `docs/defesa_slides.md` (roteiro
+de 9 slides) e `docs/defesa_cartao.md` (cartão de 1 página).
+
+**Justificativa:** sustentar a apresentação da versão avançada em três níveis de profundidade —
+estudo, apresentação e consulta rápida. Todos usam apenas números conferidos na execução de
+referência do notebook (2026-05-16) e seguem a régua de linguagem analítica do CLAUDE.md.
 
 ---
 
