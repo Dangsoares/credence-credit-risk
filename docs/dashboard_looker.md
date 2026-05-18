@@ -13,8 +13,10 @@ Looker Studio a partir de `exports/looker_ready.csv`.
 
 | Coluna | Uso no dashboard |
 |--------|------------------|
-| `default_flag` | Definição **estrita** de inadimplência (Charged Off + Default) |
-| `default_flag_alt` | Definição **alternativa** (inclui Late 31-120 days) |
+| `default_flag` | Definição **estrita** de inadimplência: `1` = inadimplente finalizado, `0` = adimplente finalizado, `NULL` = sem desfecho final |
+| `default_flag_alt` | Definição **alternativa**: inclui `Late (31-120 days)` como inadimplência |
+| `desfecho_credito` | Classificação textual: `inadimplente`, `adimplente`, `em_andamento_nao_finalizado` |
+| `status_finalizado` | `1` para desfecho final conhecido; `0` para contratos ainda em andamento |
 | `grade`, `sub_grade` | Dimensão de risco |
 | `purpose` | Finalidade do empréstimo |
 | `term` | Prazo (36 / 60) |
@@ -40,7 +42,8 @@ Criar um **parâmetro** (`Adicionar parâmetro`) chamado `def_inadimplencia`:
        ELSE default_flag_alt END
   ```
 - Todos os gráficos usam `AVG(taxa_default)` como métrica de inadimplência, de modo que
-  o gestor alterna a definição e o dashboard inteiro recalcula.
+  o gestor alterna a definição e o dashboard inteiro recalcula. Na definição estrita,
+  registros sem desfecho final ficam nulos e não entram no denominador da média.
 
 ## Métrica padrão: sempre exibir N
 
@@ -79,7 +82,8 @@ Usar como rótulo de dados nos gráficos de barras.
 
 ## Cuidados
 
-- Filtrar `loan_status = 'Late (31-120 days)'` **fora** das páginas quando a definição
-  estrita estiver ativa — esses registros só entram pela definição alternativa.
+- Não transformar `NULL` de `default_flag` em `0`: registros em andamento não são
+  adimplentes, apenas ainda não têm desfecho final.
+- `Late (31-120 days)` entra apenas pela definição alternativa via `default_flag_alt`.
 - Cores consistentes: verde = baixo risco, vermelho = alto risco, em todas as páginas.
 - Não exibir taxa de segmento com N < 100 sem aviso visual.

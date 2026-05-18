@@ -1,5 +1,6 @@
-# Data — não commitar dados brutos
+# Data — não commitar dados brutos nem processados
 data/raw/
+data/processed/
 exports/looker_ready.csv
 
 # Python

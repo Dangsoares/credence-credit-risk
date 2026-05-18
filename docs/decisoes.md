@@ -51,9 +51,14 @@ Registro cronológico das decisões tomadas na análise. Cada entrada documenta 
 
 ### 5. Tamanho do dataset para o Looker
 
-**Decisão:** Exportar apenas os registros modeláveis (Fully Paid + Charged Off/Default) para `exports/looker_ready.csv`.
+**Decisão original:** Exportar apenas os registros modeláveis (Fully Paid + Charged Off/Default) para `exports/looker_ready.csv`.
 
 **Justificativa:** 1,3M registros vs 2,26M totais. Exclui os "Current" (919k linhas) que não têm desfecho e poluiriam métricas de default rate no dashboard. Looker Studio suporta até 1M de linhas via upload direto; se necessário, usar amostra estratificada por grade × default_flag.
+
+**Atualização 2026-05-17:** o export do Looker passou a incluir também `Late (31-120 days)`
+para permitir a definição alternativa de inadimplência no dashboard. Para evitar confundir
+"em andamento" com "adimplente", `default_flag` fica nulo quando não há desfecho final,
+enquanto `default_flag_alt` marca `Late (31-120 days)` como `1`.
 
 ---
 
@@ -269,6 +274,26 @@ de 9 slides) e `docs/defesa_cartao.md` (cartão de 1 página).
 **Justificativa:** sustentar a apresentação da versão avançada em três níveis de profundidade —
 estudo, apresentação e consulta rápida. Todos usam apenas números conferidos na execução de
 referência do notebook (2026-05-16) e seguem a régua de linguagem analítica do CLAUDE.md.
+
+---
+
+## [2026-05-17] Classificação operacional de desfecho
+
+### 16. Coluna para diferenciar inadimplência finalizada de contratos em andamento
+
+**Decisão:** adicionar as colunas derivadas `default_flag`, `default_flag_alt`,
+`desfecho_credito` e `status_finalizado` aos arquivos processados.
+
+**Regra estrita:**
+- `default_flag = 1` para `Charged Off`, `Default` e `Does not meet the credit policy. Status:Charged Off`.
+- `default_flag = 0` para `Fully Paid` e `Does not meet the credit policy. Status:Fully Paid`.
+- `default_flag = NULL` para `Current`, `In Grace Period`, `Late (16-30 days)`, `Late (31-120 days)` e `Issued`.
+
+**Regra alternativa:** `default_flag_alt = 1` também para `Late (31-120 days)`.
+
+**Justificativa:** contratos em andamento não devem entrar como `0`, porque isso dilui
+artificialmente a taxa de inadimplência. A coluna textual `desfecho_credito` deixa claro
+se a linha representa `inadimplente`, `adimplente` ou `em_andamento_nao_finalizado`.
 
 ---
 
